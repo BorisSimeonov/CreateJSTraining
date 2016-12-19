@@ -23,14 +23,16 @@ let engine = (function () {
         aimHalfWidth,
         //Enemy
         shipImage,
-        shipHolder,
-        shipWidth;
+        shipContainer,
+        shipWidth,
+        maxShipsCount;
 
     function initialize(canvasId, bgSource, aimSource, shipSource) {
         canvas = document.getElementById(canvasId);
         stage = new createjs.Stage(canvas);
         score = 0;
-        shipHolder = [];
+        shipContainer = new createjs.Container();
+        maxShipsCount = 5;
 
         backgroundImage = new Image();
         backgroundImage.src = bgSource;
@@ -42,8 +44,8 @@ let engine = (function () {
 
         shipImage = new Image();
         shipImage.src = shipSource;
-        shipImage.onload = createShip;
         shipWidth = 142; //from used image width
+        shipImage.onload = createShip;
 
         attatchEvents();
     }
@@ -65,17 +67,27 @@ let engine = (function () {
     }
 
     function createShip() {
-        let shipSpeed = 3 + Math.floor(Math.random() * 5);
-        let shipHealth = Math.floor(1000 / shipSpeed);
-        let shipBitmap = new createjs.Bitmap(shipImage);
-        let xPosition = canvas.width - shipImage.width;
-        let yPosition = Math.floor(Math.random() * (canvas.height - 100));
+        stage.addChild(shipContainer);
+        let ship = new createjs.Bitmap(shipImage);
+        ship.speed = 3 + Math.floor(Math.random() * 5);
+        ship.health = Math.floor(1000 / ship.speed);
 
-        shipBitmap.x = xPosition;
-        shipBitmap.y = yPosition;
+        shipContainer.addChild(ship);
+        resetShip(ship);
+    }
 
-        shipHolder.push(new Ship(shipSpeed, shipHealth, shipBitmap));
-        stage.addChild(shipBitmap);
+    function resetShip(ship) {
+        ship.x = canvas.width - shipImage.width;
+        ship.y = Math.floor(Math.random() * (canvas.height - 100));
+        ship.isDead = false;
+    }
+
+    function removeDeadShips() {
+        shipContainer.children.forEach(ship => {
+           if(ship.isDead) {
+               shipContainer.removeChild(ship);
+           }
+        });
     }
 
     function attatchEvents() {
@@ -92,36 +104,22 @@ let engine = (function () {
 
             stage.addChild(aim);
         });
-        //TODO: add logic for ship render and movement
+
         createjs.Ticker.addEventListener('tick', () => {
-            if (shipHolder.length < 5) {
+            //Move the spawned ships
+            shipContainer.children.forEach(ship => {
+                ship.x -= ship.speed;
+                if(ship.x < shipWidth * (-1)) ship.isDead = true;
+            });
+            //Than check if there is a spot for new ship
+            if(shipContainer.children.length < maxShipsCount) {
                 createShip();
             }
-
-            for (let idx = 0; idx < shipHolder.length; ++idx) {
-                if (!shipHolder[idx].isDead) {
-                    stage.children[idx + 1].x -= shipHolder[idx].speed;
-                }
-            }
+            //update the stage after the changes
             stage.update();
-            removeEscapedShips();
+            removeDeadShips();
         });
 
-        function removeEscapedShips() {
-            for (let idx = 1; idx < stage.children.length; ++idx) {
-                if (stage.children[idx].x <= 0 - shipWidth) {
-                    shipHolder[idx - 1].isDead = true;
-                }
-            }
-
-            if (shipHolder.length < 0) return;
-
-            if (shipHolder[0].isDead) {
-                shipHolder.splice(0, 1);
-                stage.removeChildAt(1);
-            }
-            //TODO: separate ships from other stage children in container
-        }
     }
 
     return {
