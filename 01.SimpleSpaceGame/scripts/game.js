@@ -1,5 +1,5 @@
 "use strict";
-let engine = (function () {
+let spaceFightApp = function () {
     let canvas,
         stage,
         scoreCount,
@@ -7,6 +7,7 @@ let engine = (function () {
         playerLevel,
         levelText,
         playerDamage,
+        gameIsRunning,
         //Background
         backgroundImage,
         background,
@@ -21,14 +22,13 @@ let engine = (function () {
         shipWidth,
         maxShipsCount;
 
-    function initialize(canvasId, bgSource, aimSource, shipSource) {
+    function initialize(canvasId, bgSource, aimSource, shipSource, gameThis) { //gameThis is used for access to document in key events
         canvas = document.getElementById(canvasId);
         stage = new createjs.Stage(canvas);
         shipContainer = new createjs.Container();
         maxShipsCount = 5;
         playerDamage = 140;
-
-        setInfoBoard();
+        gameIsRunning = true;
 
         backgroundImage = new Image();
         backgroundImage.src = bgSource;
@@ -43,7 +43,9 @@ let engine = (function () {
         shipWidth = 142; //from used image width
         shipImage.onload = createShip;
 
-        attatchEvents();
+        setInfoBoard();
+
+        attatchEvents(gameThis);
     }
 
     function setInfoBoard() {
@@ -98,19 +100,23 @@ let engine = (function () {
 
     function removeDeadShips() {
         shipContainer.children.forEach(ship => {
-           if(ship.isDead) {
-               shipContainer.removeChild(ship);
-           }
+            if (ship.isDead) {
+                shipContainer.removeChild(ship);
+            }
         });
     }
 
-    function attatchEvents() {
+    function changeGameRunningState() {
+        gameIsRunning = !gameIsRunning;
+    }
+
+    function attatchEvents(gameThis) {
         stage.addEventListener('click', (event) => {
             let mouseTarget = stage.getObjectsUnderPoint(stage.mouseX, stage.mouseY);
             //the index of 1 is used to surpass the aim as target and select the next child of stage
-            if(mouseTarget[1].name === 'enemyShip') {
+            if (mouseTarget[1].name === 'enemyShip' && gameIsRunning) {
                 mouseTarget[1].health -= playerDamage;
-                if(mouseTarget[1].health <= 0) {
+                if (mouseTarget[1].health <= 0) {
                     mouseTarget[1].isDead = true;
                     scoreCount += 100;
                 } else {
@@ -130,35 +136,43 @@ let engine = (function () {
             stage.addChild(aim);
         });
 
+        gameThis.document.onkeypress = (e) => {
+            if (e.code === 'KeyP') changeGameRunningState();
+        };
+
         createjs.Ticker.addEventListener('tick', () => {
-            //Move the spawned ships
-            shipContainer.children.forEach(ship => {
-                ship.x -= ship.speed;
-                if(ship.x < shipWidth * (-1)) ship.isDead = true;
-            });
-            //Than check if there is a spot for new ship
-            if(shipContainer.children.length < maxShipsCount) {
-                createShip();
+            if (gameIsRunning) {
+                //Move the spawned ships
+                shipContainer.children.forEach(ship => {
+                    ship.x -= ship.speed;
+                    if (ship.x < shipWidth * (-1)) ship.isDead = true;
+                });
+                //Than check if there is a spot for new ship
+                if (shipContainer.children.length < maxShipsCount) {
+                    createShip();
+                }
+                //update the stage after the changes
+                stage.update();
+                removeDeadShips();
             }
-            //update the stage after the changes
-            stage.update();
-            removeDeadShips();
         });
 
     }
 
     return {
-        initialize
+        initialize,
+        changeGameRunningState
     }
-})();
+};
 
 
 function main() {
     const gameCanvasId = 'canvas',
         backgroundImageSource = 'res/spaceBackground.jpg',
         aimImageSource = 'res/aim.png',
-        shipImageSource = 'res/shipSmall.png';
+        shipImageSource = 'res/shipSmall.png',
+        gameEngine = spaceFightApp();
 
 
-    engine.initialize(gameCanvasId, backgroundImageSource, aimImageSource, shipImageSource);
+    gameEngine.initialize(gameCanvasId, backgroundImageSource, aimImageSource, shipImageSource, this);
 }
